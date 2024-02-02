@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.kingname'
-version = '0.0.1'
+version = '1.0.2'
 
 java {
     sourceCompatibility = '11'
@@ -29,8 +29,8 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.assertj:assertj-core:3.24.2'
     // 테스트를 위한 Lombok 설정
-    testCompileOnly 'org.projectlombok:lombok:버전'
-    testAnnotationProcessor 'org.projectlombok:lombok:버전'
+    testCompileOnly 'org.projectlombok:lombok:1.18.10'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.10'
 }
 
 publishing {
@@ -38,7 +38,7 @@ publishing {
         mavenJava(MavenPublication) {
             groupId = 'com.github.shing100'
             artifactId = 'embeddingStoreManager'
-            version = '0.0.1'
+            version = '1.0.2'
 
             from components.java
         }
