@@ -1,0 +1,18 @@
+{
+  "dynamic": "false",
+  "properties": {
+    "hash": {
+      "type": "keyword"
+    },
+    "text": {
+      "type": "keyword"
+    },
+    "has_embedding": {
+      "type": "boolean"
+    },
+    "embedding": {
+      "type": "dense_vector",
+      "dims": 768
+    }
+  }
+}

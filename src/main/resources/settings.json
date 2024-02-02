@@ -1,0 +1,15 @@
+{
+  "index.mapping.coerce": true,
+  "index.mapping.ignore_malformed": true,
+  "unassigned": {
+    "node_left": {
+      "delayed_timeout": "1m"
+    }
+  },
+  "lifecycle": {
+    "name": "delete-120days"
+  },
+  "priority": "100",
+  "number_of_shards": "3",
+  "number_of_replicas": "1"
+}

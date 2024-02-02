@@ -1,0 +1,45 @@
+plugins {
+    id 'java-library'
+    id 'idea'
+    id 'maven-publish'
+}
+
+group = 'com.kingname'
+version = '0.0.1'
+
+java {
+    sourceCompatibility = '11'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.8.2'
+    implementation 'com.google.guava:guava:31.1-jre'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.2'
+    implementation 'co.elastic.clients:elasticsearch-java:8.8.2'
+    implementation 'org.elasticsearch.client:elasticsearch-rest-client:8.8.2'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.assertj:assertj-core:3.24.2'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.5'
+    compileOnly 'org.projectlombok:lombok:1.18.10'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = 'com.github.shing100'
+            artifactId = 'embeddingStoreManager'
+            version = '0.0.1'
+
+            from components.java
+        }
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
