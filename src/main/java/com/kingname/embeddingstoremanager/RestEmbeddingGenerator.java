@@ -1,6 +1,8 @@
 package com.kingname.embeddingstoremanager;
 
 import com.google.gson.Gson;
+import com.kingname.embeddingstoremanager.exception.RestEmbeddingGeneratorException;
+import com.kingname.embeddingstoremanager.vo.EmbeddingResponse;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
