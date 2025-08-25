@@ -23,6 +23,11 @@ dependencies {
     implementation 'org.elasticsearch.client:elasticsearch-rest-client:8.8.2'
     implementation 'org.apache.httpcomponents:httpclient:4.5.13'
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.5'
+    
+    // Logging framework
+    implementation 'org.slf4j:slf4j-api:2.0.7'
+    implementation 'ch.qos.logback:logback-classic:1.4.7'
+    
     compileOnly 'org.projectlombok:lombok:1.18.10'
     annotationProcessor 'org.projectlombok:lombok:1.18.10'
 

@@ -19,4 +19,17 @@ public class EmbeddingCacheManagerConfig {
     private final String embeddingApiUrl;
     @Builder.Default
     private final Integer maxLength = 3_000;
+    
+    // Authentication support
+    private final String apiKey;           // API Key for Bearer token authentication
+    private final String apiKeyHeader;     // Custom header name for API key (default: "Authorization")
+    
+    @Builder.Default
+    private final Integer connectionTimeoutMs = 10_000;  // 10 seconds
+    @Builder.Default  
+    private final Integer socketTimeoutMs = 30_000;      // 30 seconds
+    @Builder.Default
+    private final Integer maxConnections = 20;           // Max total connections
+    @Builder.Default
+    private final Integer maxConnectionsPerRoute = 10;   // Max connections per route
 }
