@@ -28,6 +28,14 @@ dependencies {
     implementation 'org.slf4j:slf4j-api:2.0.7'
     implementation 'ch.qos.logback:logback-classic:1.4.7'
     
+    // Resilience4j for Circuit Breaker pattern (Java 11 compatible version)
+    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:1.7.1'
+    implementation 'io.github.resilience4j:resilience4j-retry:1.7.1'
+    implementation 'io.github.resilience4j:resilience4j-timelimiter:1.7.1'
+    
+    // Micrometer for metrics collection (Java 11 compatible version)
+    implementation 'io.micrometer:micrometer-core:1.9.14'
+    
     compileOnly 'org.projectlombok:lombok:1.18.10'
     annotationProcessor 'org.projectlombok:lombok:1.18.10'
 

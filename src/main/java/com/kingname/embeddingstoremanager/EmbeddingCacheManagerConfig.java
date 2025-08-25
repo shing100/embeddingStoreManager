@@ -32,4 +32,28 @@ public class EmbeddingCacheManagerConfig {
     private final Integer maxConnections = 20;           // Max total connections
     @Builder.Default
     private final Integer maxConnectionsPerRoute = 10;   // Max connections per route
+    
+    // Circuit Breaker configuration
+    @Builder.Default
+    private final Boolean enableCircuitBreaker = true;   // Enable circuit breaker
+    @Builder.Default
+    private final Integer circuitBreakerFailureThreshold = 5; // Number of failures to open circuit
+    @Builder.Default
+    private final Long circuitBreakerWaitDurationMs = 60_000L; // Wait time in open state (1 minute)
+    @Builder.Default
+    private final Integer circuitBreakerMinimumNumberOfCalls = 10; // Minimum calls before evaluation
+    @Builder.Default
+    private final Float circuitBreakerFailureRateThreshold = 50.0f; // Failure rate % to open circuit
+    
+    // Retry configuration
+    @Builder.Default
+    private final Boolean enableRetry = true;            // Enable retry mechanism
+    @Builder.Default
+    private final Integer maxRetryAttempts = 3;          // Maximum retry attempts
+    @Builder.Default
+    private final Long retryWaitDurationMs = 1_000L;     // Wait time between retries (1 second)
+    
+    // Metrics configuration
+    @Builder.Default
+    private final Boolean enableMetrics = true;          // Enable metrics collection
 }

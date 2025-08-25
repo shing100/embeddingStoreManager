@@ -13,6 +13,14 @@ import org.apache.http.client.config.RequestConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// Resilience4j imports
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,11 +33,19 @@ public class RestEmbeddingGenerator implements EmbeddingGenerator {
     private final Gson gson = new Gson();
     private final EmbeddingCacheManagerConfig ecmConfig;
     private final CloseableHttpClient httpClient;
+    private final CircuitBreaker circuitBreaker;
+    private final Retry retry;
+    private final MeterRegistry meterRegistry;
 
     public RestEmbeddingGenerator(EmbeddingCacheManagerConfig ecmConfig) {
         this.ecmConfig = ecmConfig;
         this.httpClient = createHttpClient();
-        logger.info("RestEmbeddingGenerator initialized with connection pooling");
+        this.meterRegistry = ecmConfig.getEnableMetrics() ? new SimpleMeterRegistry() : null;
+        this.circuitBreaker = createCircuitBreaker();
+        this.retry = createRetry();
+        
+        logger.info("RestEmbeddingGenerator initialized with connection pooling, circuit breaker: {}, retry: {}, metrics: {}", 
+                    ecmConfig.getEnableCircuitBreaker(), ecmConfig.getEnableRetry(), ecmConfig.getEnableMetrics());
     }
     
     /**
@@ -51,6 +67,58 @@ public class RestEmbeddingGenerator implements EmbeddingGenerator {
                 .setDefaultRequestConfig(requestConfig)
                 .build();
     }
+    
+    /**
+     * Creates circuit breaker for embedding API calls
+     */
+    private CircuitBreaker createCircuitBreaker() {
+        if (!ecmConfig.getEnableCircuitBreaker()) {
+            return null;
+        }
+        
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .failureRateThreshold(ecmConfig.getCircuitBreakerFailureRateThreshold())
+                .waitDurationInOpenState(java.time.Duration.ofMillis(ecmConfig.getCircuitBreakerWaitDurationMs()))
+                .slidingWindowSize(ecmConfig.getCircuitBreakerMinimumNumberOfCalls())
+                .minimumNumberOfCalls(ecmConfig.getCircuitBreakerMinimumNumberOfCalls())
+                .build();
+        
+        CircuitBreaker breaker = CircuitBreaker.of("embeddingApi", config);
+        
+        // Add event listeners for logging
+        breaker.getEventPublisher().onStateTransition(event ->
+                logger.info("Circuit breaker state transition: {} -> {}", 
+                           event.getStateTransition().getFromState(), 
+                           event.getStateTransition().getToState()));
+        
+        breaker.getEventPublisher().onCallNotPermitted(event ->
+                logger.warn("Circuit breaker rejected call - circuit is OPEN"));
+        
+        return breaker;
+    }
+    
+    /**
+     * Creates retry mechanism for embedding API calls
+     */
+    private Retry createRetry() {
+        if (!ecmConfig.getEnableRetry()) {
+            return null;
+        }
+        
+        RetryConfig config = RetryConfig.custom()
+                .maxAttempts(ecmConfig.getMaxRetryAttempts())
+                .waitDuration(java.time.Duration.ofMillis(ecmConfig.getRetryWaitDurationMs()))
+                .retryExceptions(RestEmbeddingGeneratorException.class, Exception.class)
+                .build();
+        
+        Retry retryInstance = Retry.of("embeddingApi", config);
+        
+        // Add event listeners for logging
+        retryInstance.getEventPublisher().onRetry(event ->
+                logger.info("Retry attempt {} for embedding API call", event.getNumberOfRetryAttempts()));
+        
+        return retryInstance;
+    }
 
     @Override
     public List<Double> generateEmbedding(String text) throws RestEmbeddingGeneratorException {
@@ -59,6 +127,64 @@ public class RestEmbeddingGenerator implements EmbeddingGenerator {
         // Input validation for SSRF prevention
         validateApiUrl(this.ecmConfig.getEmbeddingApiUrl());
         
+        // Create the embedding generation function
+        java.util.function.Supplier<List<Double>> embeddingSupplier = () -> {
+            try {
+                return callEmbeddingApi(text);
+            } catch (Exception e) {
+                if (e instanceof RestEmbeddingGeneratorException) {
+                    throw new RuntimeException(e.getMessage(), e);
+                }
+                throw new RuntimeException(e.getMessage(), e.getCause());
+            }
+        };
+        
+        // Apply circuit breaker and retry patterns
+        java.util.function.Supplier<List<Double>> decoratedSupplier = embeddingSupplier;
+        
+        if (circuitBreaker != null) {
+            decoratedSupplier = CircuitBreaker.decorateSupplier(circuitBreaker, decoratedSupplier);
+            logger.debug("Applied circuit breaker to embedding generation");
+        }
+        
+        if (retry != null) {
+            decoratedSupplier = Retry.decorateSupplier(retry, decoratedSupplier);
+            logger.debug("Applied retry mechanism to embedding generation");
+        }
+        
+        try {
+            List<Double> result = decoratedSupplier.get();
+            
+            // Record metrics if enabled
+            if (meterRegistry != null) {
+                meterRegistry.counter("embedding.api.success").increment();
+            }
+            
+            return result;
+            
+        } catch (Exception e) {
+            // Record metrics if enabled
+            if (meterRegistry != null) {
+                meterRegistry.counter("embedding.api.failure").increment();
+            }
+            
+            logger.error("Embedding generation failed after retries and circuit breaker: {}", e.getMessage());
+            
+            // Unwrap RuntimeException if it wraps a RestEmbeddingGeneratorException
+            if (e instanceof RuntimeException && e.getCause() instanceof RestEmbeddingGeneratorException) {
+                throw (RestEmbeddingGeneratorException) e.getCause();
+            }
+            if (e instanceof RestEmbeddingGeneratorException) {
+                throw e;
+            }
+            throw new RestEmbeddingGeneratorException(e.getMessage(), e.getCause());
+        }
+    }
+    
+    /**
+     * Makes the actual API call to generate embedding
+     */
+    private List<Double> callEmbeddingApi(String text) throws RestEmbeddingGeneratorException {
         try {
             HttpPost httpPost = new HttpPost(this.ecmConfig.getEmbeddingApiUrl());
             Map<String, String> body = new HashMap<>();
@@ -114,10 +240,9 @@ public class RestEmbeddingGenerator implements EmbeddingGenerator {
                 return embedding;
             }
         } catch (RestEmbeddingGeneratorException e) {
-            logger.error("Embedding generation failed: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            logger.error("Unexpected error during embedding generation: {}", e.getMessage(), e);
+            logger.error("Unexpected error during API call: {}", e.getMessage(), e);
             throw new RestEmbeddingGeneratorException(e.getMessage(), e.getCause());
         }
     }
@@ -149,5 +274,12 @@ public class RestEmbeddingGenerator implements EmbeddingGenerator {
         }
         
         logger.debug("API URL validation passed: {}", url);
+    }
+    
+    /**
+     * Returns the circuit breaker instance for health checking
+     */
+    public CircuitBreaker getCircuitBreaker() {
+        return this.circuitBreaker;
     }
 }
